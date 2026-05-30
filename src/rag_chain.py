@@ -409,6 +409,27 @@ SOURCES:
                 "sources": source_str,
             })
             response = result.model_dump()
+            
+            # Catch LLM rambling about missing info even in structured output
+            missing_info_phrases = [
+                "i do not have the information regarding this in my knowledge base",
+                "is not explicitly mentioned in the provided context",
+                "does not mention",
+                "not provide information",
+                "does not specifically address",
+                "is not mentioned in the provided context"
+            ]
+            desc_lower = response.get("description", "").lower()
+            if any(phrase in desc_lower for phrase in missing_info_phrases):
+                response = {
+                    "description": "I do not have the information regarding this in my knowledge base.",
+                    "incoterms_context": "Not applicable.",
+                    "dgft_context": "Not applicable.",
+                    "hs_code_context": "Not applicable.",
+                    "wto_context": "Not applicable.",
+                    "citations": []
+                }
+
         except Exception as e:
             logger.error(f"Unified query structured output failed: {e}")
             fallback_chain = prompt | self.llm | StrOutputParser()
@@ -419,8 +440,31 @@ SOURCES:
             })
             import re
             
-            # Check if it triggered the anti-hallucination rule
-            if "I do not have the information regarding this in my knowledge base" in text_result:
+            # Catch LLM rambling about missing info
+            missing_info_phrases = [
+                "i do not have the information regarding this in my knowledge base",
+                "is not explicitly mentioned in the provided context",
+                "does not mention",
+                "not provide information",
+                "does not specifically address",
+                "is not mentioned in the provided context"
+            ]
+            
+            # Check if it triggered the anti-hallucination rule or is rambling about missing info
+            text_result_lower = text_result.lower()
+            is_missing_info = any(phrase in text_result_lower for phrase in missing_info_phrases)
+            
+            if is_missing_info and len(text_result) > 200:
+                # If it's rambling for more than 200 chars about missing info, just cut it off.
+                response = {
+                    "description": "I do not have the information regarding this in my knowledge base.",
+                    "incoterms_context": "Not applicable.",
+                    "dgft_context": "Not applicable.",
+                    "hs_code_context": "Not applicable.",
+                    "wto_context": "Not applicable.",
+                    "citations": []
+                }
+            elif "i do not have the information regarding this in my knowledge base" in text_result_lower:
                 response = {
                     "description": "I do not have the information regarding this in my knowledge base.",
                     "incoterms_context": "Not applicable.",
