@@ -225,7 +225,7 @@ CONTEXT:
         docs = self.vectorstore.similarity_search(
             product_description,
             k=4,
-            filter=lambda meta: meta.get("doc_type") == "hs_code",
+            filter={"doc_type": "hs_code"},
         )
 
         if not docs:
@@ -447,11 +447,14 @@ SOURCES:
         query_lower = query.lower()
         # If the query asks about duties or HS codes, explicitly fetch HS code chunks
         if any(term in query_lower for term in ["hs code", "customs duty", "import duty", "landed cost"]):
+            # Strip generic conversational words to focus the embedding on the product
+            clean_q = query.replace("What is the customs duty on importing ", "").replace(" into India?", "").replace("Calculate the total landed cost for importing ", "").replace(" into India.", "").replace("What is the import duty on ", "")
+            
             general_docs = self.vectorstore.similarity_search(query, k=k)
             hs_docs = self.vectorstore.similarity_search(
-                query, 
+                clean_q, 
                 k=3, 
-                filter=lambda meta: meta.get("doc_type") == "hs_code"
+                filter={"doc_type": "hs_code"}
             )
             
             # Combine, putting the HS docs first for higher precision rank

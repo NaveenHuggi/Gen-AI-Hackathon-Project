@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-05-30T20:42:37.359771",
+  "timestamp": "2026-05-30T22:42:42.016932",
   "num_queries": 15,
-  "average_context_precision": 0.5967,
+  "average_context_precision": 0.7922,
   "target_precision": 0.75,
-  "target_met": false,
+  "target_met": true,
   "per_query_results": [
     {
       "query_index": 1,
@@ -83,12 +83,12 @@
     {
       "query_index": 6,
       "query": "What is the customs duty on importing lithium-ion batteries into India?",
-      "context_precision": 0.0,
-      "relevant_chunks": 0,
+      "context_precision": 1.0,
+      "relevant_chunks": 2,
       "total_chunks": 6,
       "relevance_pattern": [
-        false,
-        false,
+        true,
+        true,
         false,
         false,
         false,
@@ -128,16 +128,16 @@
     {
       "query_index": 9,
       "query": "What does Chapter 4 of DGFT FTP 2023 cover regarding Advance Authorizations?",
-      "context_precision": 0.0,
-      "relevant_chunks": 0,
+      "context_precision": 0.2667,
+      "relevant_chunks": 2,
       "total_chunks": 6,
       "relevance_pattern": [
         false,
         false,
         false,
         false,
-        false,
-        false
+        true,
+        true
       ]
     },
     {
@@ -173,11 +173,11 @@
     {
       "query_index": 12,
       "query": "What customs duty applies to importing crude palm oil into India?",
-      "context_precision": 0.0,
-      "relevant_chunks": 0,
+      "context_precision": 1.0,
+      "relevant_chunks": 1,
       "total_chunks": 6,
       "relevance_pattern": [
-        false,
+        true,
         false,
         false,
         false,
@@ -188,13 +188,13 @@
     {
       "query_index": 13,
       "query": "What is the import duty on gold bullion in India?",
-      "context_precision": 0.3333,
+      "context_precision": 1.0,
       "relevant_chunks": 1,
       "total_chunks": 6,
       "relevance_pattern": [
-        false,
-        false,
         true,
+        false,
+        false,
         false,
         false,
         false
