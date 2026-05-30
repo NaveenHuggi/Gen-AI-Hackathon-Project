@@ -358,7 +358,7 @@ SOURCES:
         return response
 
     # ─── Unified Trade Query ──────────────────────────────
-    def unified_trade_query(self, user_query: str) -> dict:
+    def unified_trade_query(self, user_query: str, target_language: str = "English") -> dict:
         """
         Queries across all 4 domains (INCOTERMS, DGFT, HS Codes, WTO) and structures the output.
         """
@@ -390,6 +390,7 @@ INSTRUCTIONS FOR OUTPUT:
 3. Cite exact clauses, chapter numbers, duty percentages, and page numbers where available.
 4. If a domain is not relevant, explicitly explain WHY it is not applicable based on the context, rather than just saying "Not applicable".
 5. CRITICAL ANTI-HALLUCINATION RULE: If the retrieved context does not contain the specific answer to the user's query, you MUST abort the detailed structure and output EXACTLY and ONLY the phrase "I do not have the information regarding this in my knowledge base." Do NOT attempt to summarize unrelated context or guess.
+6. OUTPUT LANGUAGE: You MUST generate your ENTIRE output (including all domains and summaries) perfectly translated into {language}.
 
 RETRIEVED CONTEXT:
 {context}
@@ -407,6 +408,7 @@ SOURCES:
                 "context": context,
                 "query": user_query,
                 "sources": source_str,
+                "language": target_language,
             })
             response = result.model_dump()
             
@@ -437,6 +439,7 @@ SOURCES:
                 "context": context,
                 "query": user_query,
                 "sources": source_str,
+                "language": target_language,
             })
             import re
             

@@ -432,13 +432,20 @@ unified_query = st.text_area(
     key="unified_input",
 )
 
-col1, col2 = st.columns([1, 5])
+col1, col2, col3 = st.columns([2, 3, 5])
 with col1:
     unified_submit = st.button("🔍 Analyze", key="unified_submit", use_container_width=True)
+with col2:
+    target_language = st.selectbox(
+        "Response Language", 
+        ["English", "Hindi", "French", "Spanish", "Mandarin"], 
+        index=0, 
+        label_visibility="collapsed"
+    )
 
 if unified_submit and unified_query:
-    with st.spinner("Analyzing across all knowledge bases..."):
-        result = pipeline.unified_trade_query(unified_query)
+    with st.spinner(f"Analyzing across all knowledge bases in {target_language}..."):
+        result = pipeline.unified_trade_query(unified_query, target_language=target_language)
 
     st.markdown('<div class="result-header" style="font-size: 1.5rem; border-bottom: 2px solid rgba(99, 102, 241, 0.5); padding-bottom: 0.5rem; margin-bottom: 1.5rem;">📑 Comprehensive Analysis</div>', unsafe_allow_html=True)
     
@@ -458,11 +465,17 @@ if unified_submit and unified_query:
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Citations
-    citations = result.get("citations", [])
-    if citations:
-        st.markdown("#### Document Citations")
-        for citation in citations:
-            st.markdown(f"- {citation}")
+    if result.get("citations"):
+        st.markdown("#### 📎 View Retrieved Source Documents")
+        with st.expander("Click to view full citations"):
+            for cit in result["citations"]:
+                st.markdown(f"> {cit}")
+                
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="display: inline-block; padding: 0.4rem 1rem; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 20px; color: #a5b4fc; font-weight: 600; font-size: 0.85rem; letter-spacing: 0.5px;">🌐 Response generated in: {target_language}</div>',
+        unsafe_allow_html=True
+    )
             
     st.markdown('<br>', unsafe_allow_html=True)
 
