@@ -124,7 +124,7 @@ def evaluate_context_precision_manual(pipeline: TradeRAGPipeline) -> dict:
 
         logger.info(f"Evaluating query {i}/{len(EVALUATION_QUERIES)}: {query[:80]}...")
 
-        # Retrieve context
+        # Retrieve context (using updated pipeline with HS code routing)
         retrieved_docs = pipeline.retrieve_context(query, k=6)
 
         # Calculate precision at each rank
@@ -198,11 +198,11 @@ def run_evaluation():
     print("=" * 60)
     print(f"  Total Queries Evaluated:      {results['num_queries']}")
     print(f"  Average Context Precision:    {results['average_context_precision']:.4f}")
-    print(f"  Target (≥ 0.75):              {'✅ MET' if results['target_met'] else '❌ NOT MET'}")
+    print(f"  Target (>= 0.75):             {'[PASS] MET' if results['target_met'] else '[FAIL] NOT MET'}")
     print("=" * 60)
 
     for r in results["per_query_results"]:
-        status = "✅" if r["context_precision"] >= 0.75 else "⚠️"
+        status = "[PASS]" if r["context_precision"] >= 0.75 else "[FAIL]"
         print(f"  {status} Q{r['query_index']:2d}: CP={r['context_precision']:.4f} | {r['relevant_chunks']}/{r['total_chunks']} relevant | {r['query'][:60]}...")
 
     print(f"\nResults saved to: {output_path}")

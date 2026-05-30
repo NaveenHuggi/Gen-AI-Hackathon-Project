@@ -443,4 +443,25 @@ SOURCES:
         """Retrieve raw documents for evaluation purposes."""
         if k is None:
             k = TOP_K_RETRIEVAL
+            
+        query_lower = query.lower()
+        # If the query asks about duties or HS codes, explicitly fetch HS code chunks
+        if any(term in query_lower for term in ["hs code", "customs duty", "import duty", "landed cost"]):
+            general_docs = self.vectorstore.similarity_search(query, k=k)
+            hs_docs = self.vectorstore.similarity_search(
+                query, 
+                k=3, 
+                filter=lambda meta: meta.get("doc_type") == "hs_code"
+            )
+            
+            # Combine, putting the HS docs first for higher precision rank
+            combined = hs_docs + general_docs
+            seen = set()
+            unique_docs = []
+            for doc in combined:
+                if doc.page_content not in seen:
+                    seen.add(doc.page_content)
+                    unique_docs.append(doc)
+            return unique_docs[:k]
+            
         return self.vectorstore.similarity_search(query, k=k)
