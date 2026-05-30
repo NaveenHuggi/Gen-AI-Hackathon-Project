@@ -23,6 +23,41 @@ TradeComply AI is a powerful Retrieval-Augmented Generation (RAG) system built f
 
 ---
 
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    subgraph Data Sources
+        A[DGFT Policy PDFs] -->|pdfplumber| D(Text Chunking)
+        B[WTO Reviews PDFs] -->|pdfplumber| D
+        C[INCOTERMS & HS Codes JSON] -->|Direct Parsing| D
+    end
+
+    subgraph Vectorization & Storage
+        D -->|HuggingFace Embeddings| E[(FAISS Vector Database)]
+        E -.->|Stores Document Metadata| E
+    end
+
+    subgraph Query & Retrieval
+        F[User Query via Streamlit UI] --> G{Semantic Router}
+        G -->|Trade Policy Query| H[Similarity Search K=6]
+        G -->|Duty / HS Code Query| I[Targeted HS Code Filter Search]
+        H --> J[Aggregated Context]
+        I --> J
+    end
+
+    subgraph Generation & Validation
+        J --> K[Groq LLM Llama-3]
+        F --> K
+        K -->|JSON Output Parsing| L{Schema Validation}
+        L -->|Success| M[Structured Multi-Domain UI]
+        L -->|Fallback / Missing Info| N[Regex Cleanup & Truncation]
+        N --> M
+    end
+```
+
+---
+
 ## 🚀 Quickstart Guide (Reproducibility)
 
 ### 1. Prerequisites
