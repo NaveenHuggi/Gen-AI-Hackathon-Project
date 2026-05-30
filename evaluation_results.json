@@ -1,0 +1,234 @@
+{
+  "timestamp": "2026-05-30T20:42:37.359771",
+  "num_queries": 15,
+  "average_context_precision": 0.5967,
+  "target_precision": 0.75,
+  "target_met": false,
+  "per_query_results": [
+    {
+      "query_index": 1,
+      "query": "Under CIF terms, at what point does risk transfer from seller to buyer, and what insurance coverage ",
+      "context_precision": 0.9167,
+      "relevant_chunks": 4,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        true
+      ]
+    },
+    {
+      "query_index": 2,
+      "query": "What is the key difference between CIP and CIF in terms of insurance requirements under INCOTERMS 20",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 3,
+      "query": "What was the INCOTERMS 2020 change from DAT and what does the new rule DPU mean?",
+      "context_precision": 0.7,
+      "relevant_chunks": 3,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        false,
+        false,
+        true,
+        true,
+        false
+      ]
+    },
+    {
+      "query_index": 4,
+      "query": "Under FOB terms, who is responsible for export clearance and when does risk transfer?",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 5,
+      "query": "What is the HS code for smartphones and what customs duties apply in India?",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 6,
+      "query": "What is the customs duty on importing lithium-ion batteries into India?",
+      "context_precision": 0.0,
+      "relevant_chunks": 0,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 7,
+      "query": "Calculate the total landed cost for importing laptops worth CIF ₹100,000 into India.",
+      "context_precision": 0.0,
+      "relevant_chunks": 0,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 8,
+      "query": "What are the conditions for conversion of a domestic unit into an Export Oriented Unit under DGFT FT",
+      "context_precision": 0.0,
+      "relevant_chunks": 0,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 9,
+      "query": "What does Chapter 4 of DGFT FTP 2023 cover regarding Advance Authorizations?",
+      "context_precision": 0.0,
+      "relevant_chunks": 0,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 10,
+      "query": "Under INCOTERMS 2020 EXW, who bears the risk and cost of export clearance?",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 11,
+      "query": "What is the difference between DAP and DPU in terms of unloading obligation?",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 12,
+      "query": "What customs duty applies to importing crude palm oil into India?",
+      "context_precision": 0.0,
+      "relevant_chunks": 0,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 13,
+      "query": "What is the import duty on gold bullion in India?",
+      "context_precision": 0.3333,
+      "relevant_chunks": 1,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "query_index": 14,
+      "query": "Under CPT terms, explain the critical distinction between where risk transfers and where cost obliga",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "query_index": 15,
+      "query": "What is the general provision regarding imports and exports under Chapter 2 of DGFT FTP 2023?",
+      "context_precision": 1.0,
+      "relevant_chunks": 6,
+      "total_chunks": 6,
+      "relevance_pattern": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  ]
+}
