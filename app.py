@@ -304,7 +304,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("""
     **How to Use:**
-    1. Select a query mode via the tabs
+    1. Enter a query 
     2. Enter your trade compliance question
     3. Get precise, citation-backed answers
     """)
