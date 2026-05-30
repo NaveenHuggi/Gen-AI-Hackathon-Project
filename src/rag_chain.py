@@ -389,7 +389,7 @@ INSTRUCTIONS FOR OUTPUT:
 2. For EACH of the 4 domains, you MUST provide a detailed, comprehensive explanation (at least 3-4 sentences per domain). Do NOT provide just a single sentence.
 3. Cite exact clauses, chapter numbers, duty percentages, and page numbers where available.
 4. If a domain is not relevant, explicitly explain WHY it is not applicable based on the context, rather than just saying "Not applicable".
-5. IMPORTANT: If the retrieved context does not contain the answer or the information is missing from your knowledge base, you MUST clearly state "I do not have the information regarding this in my knowledge base." Do NOT hallucinate or guess.
+5. CRITICAL ANTI-HALLUCINATION RULE: If the retrieved context does not contain the specific answer to the user's query, you MUST abort the detailed structure and output EXACTLY and ONLY the phrase "I do not have the information regarding this in my knowledge base." Do NOT attempt to summarize unrelated context or guess.
 
 RETRIEVED CONTEXT:
 {context}
@@ -419,28 +419,39 @@ SOURCES:
             })
             import re
             
-            # Helper to extract sections based on headers
-            def extract_section(text, header):
-                match = re.search(rf"{header}.*?(?=(?:INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade|$))", text, re.IGNORECASE | re.DOTALL)
-                return match.group(0).strip() if match else "Not explicitly mentioned in the unstructured response. See summary."
+            # Check if it triggered the anti-hallucination rule
+            if "I do not have the information regarding this in my knowledge base" in text_result:
+                response = {
+                    "description": "I do not have the information regarding this in my knowledge base.",
+                    "incoterms_context": "Not applicable.",
+                    "dgft_context": "Not applicable.",
+                    "hs_code_context": "Not applicable.",
+                    "wto_context": "Not applicable.",
+                    "citations": []
+                }
+            else:
+                # Helper to extract sections based on headers
+                def extract_section(text, header):
+                    match = re.search(rf"{header}.*?(?=(?:INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade|$))", text, re.IGNORECASE | re.DOTALL)
+                    return match.group(0).strip() if match else "Not explicitly mentioned in the unstructured response. See summary."
 
-            incoterms = extract_section(text_result, "INCOTERMS 2020")
-            hs_code = extract_section(text_result, "ITC-HS Customs")
-            dgft = extract_section(text_result, "DGFT Foreign")
-            wto = extract_section(text_result, "WTO Trade")
-            
-            # The summary is anything before the first major header
-            summary_match = re.split(r"INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade", text_result, maxsplit=1, flags=re.IGNORECASE)
-            summary = summary_match[0].strip() if summary_match else text_result
+                incoterms = extract_section(text_result, "INCOTERMS 2020")
+                hs_code = extract_section(text_result, "ITC-HS Customs")
+                dgft = extract_section(text_result, "DGFT Foreign")
+                wto = extract_section(text_result, "WTO Trade")
+                
+                # The summary is anything before the first major header
+                summary_match = re.split(r"INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade", text_result, maxsplit=1, flags=re.IGNORECASE)
+                summary = summary_match[0].strip() if summary_match else text_result
 
-            response = {
-                "description": summary if summary else "See detailed domains below.",
-                "incoterms_context": incoterms,
-                "dgft_context": dgft,
-                "hs_code_context": hs_code,
-                "wto_context": wto,
-                "citations": sources
-            }
+                response = {
+                    "description": summary if summary else "See detailed domains below.",
+                    "incoterms_context": incoterms,
+                    "dgft_context": dgft,
+                    "hs_code_context": hs_code,
+                    "wto_context": wto,
+                    "citations": sources
+                }
         response["retrieved_sources"] = [
             {
                 "source": doc.metadata.get("source"),
