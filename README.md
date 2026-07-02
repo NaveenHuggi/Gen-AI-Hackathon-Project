@@ -1,121 +1,268 @@
 # 🚢 TradeComply AI
 
+<div align="center">
+
 **Intelligent Logistics Regulation & INCOTERMS Knowledge Base — Powered by RAG**
 
-TradeComply AI is a powerful Retrieval-Augmented Generation (RAG) system built for export managers, freight forwarders, and customs teams. It seamlessly ingests and analyzes complex international trade compliance documents—including the INCOTERMS 2020 handbook, DGFT Foreign Trade Policy 2023, ITC-HS Customs Tariff Codes, and WTO Trade Policy Reviews—to provide exact regulatory answers and customs duty computations.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.38%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3%2B-1C3C3C?logo=langchain&logoColor=white)](https://langchain.com)
+[![Groq](https://img.shields.io/badge/LLM-Groq%20%7C%20Llama%203.3%2070B-F55036)](https://groq.com)
+[![FAISS](https://img.shields.io/badge/Vector%20DB-FAISS-blue)](https://faiss.ai)
+[![License](https://img.shields.io/badge/License-Hackathon%202026-purple)](./LICENSE)
+
+*Built for the **Gen AI Hackathon 2026***
+
+</div>
+
+---
+
+## 📌 Overview
+
+**TradeComply AI** is an enterprise-grade Retrieval-Augmented Generation (RAG) system designed for export managers, freight forwarders, customs brokers, and trade compliance teams.
+
+It ingests and semantically indexes complex international trade regulatory documents and provides **structured, citation-backed, multi-domain answers** to natural language queries — in **5 languages**.
+
+### Knowledge Base Covers:
+| Domain | Source |
+|---|---|
+| 📘 **INCOTERMS 2020** | ICC Rules (Full handbook) |
+| 📋 **DGFT Foreign Trade Policy** | FTP 2023 + Notifications |
+| 📊 **ITC-HS Customs Tariff** | Top 100+ HS codes with BCD & IGST rates |
+| 🌐 **WTO Trade Policy Reviews** | India TPR + Bound/Applied Tariff Analysis |
+
+---
 
 ## ✨ Features
 
-- **Unified Trade Query System:** Ask complex questions about trade scenarios, and the AI cross-references 4 independent regulatory databases simultaneously.
-- **Customs Duty & HS Code Calculator:** Query an item in plain language (e.g., "lithium-ion batteries"), and the system identifies the matching HS code and calculates the exact BCD, SWS, and IGST components for the total landed cost.
-- **Detailed Source Citations:** Every answer links directly back to the source document, complete with chapter headers and page numbers, enabling instant compliance verification.
-- **Premium Glassmorphism UI:** Built with Streamlit and custom CSS for a beautiful, responsive, modern dark-themed user experience.
+### 🧠 Two-Stage Per-Domain RAG Architecture
+The core innovation: instead of one LLM call for everything, the system runs **5 parallel LLM calls** — one dedicated expert per domain and one for the executive summary. Each domain expert sees only its relevant document chunks, producing rich, focused answers with zero context dilution.
+
+### 🔍 Unified Trade Query Interface
+Ask one question. Get structured answers across all 4 regulatory domains simultaneously, organized into clean tabbed views:
+- 📘 INCOTERMS tab — Risk transfer, seller/buyer obligations, delivery rules
+- 📋 DGFT tab — Import/export licensing, scheme eligibility, compliance steps  
+- 📊 HS Code & Duty tab — HS classification + full customs duty table (BCD, SWS, IGST)
+- 🌐 WTO tab — Bound vs. applied tariff rates, trade policy review insights
+
+### 💹 Deterministic Customs Duty Calculator
+Computes the full Indian customs duty cascade mathematically:
+```
+BCD = Assessable Value × BCD%
+SWS = BCD × 10%
+IGST = (AV + BCD + SWS) × IGST%
+Total Duty = BCD + SWS + IGST
+Total Landed Cost = AV + Total Duty
+```
+
+### 🌐 Multi-Language Output
+Full response translation into **English, Hindi, French, Spanish, and Mandarin** — across all domain tabs and the executive summary.
+
+### 📎 Source Citations
+Every answer is backed by source document metadata: file name, chapter, and page number for instant verification.
+
+### 🎨 Premium Dark UI
+Built with Streamlit + custom glassmorphism CSS using Plus Jakarta Sans typography, smooth hover animations, and a radial dark gradient theme.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    subgraph Ingestion["📥 Stage 0 — Ingestion (ingest.py)"]
+        A1[INCOTERMS PDFs] --> CH(Text Chunker\nChunk=1200, Overlap=200)
+        A2[DGFT Policy PDFs] --> CH
+        A3[WTO Review PDFs] --> CH
+        A4[ITC-HS Codes JSON] --> CH
+        CH --> EMB(HuggingFace Embeddings\nall-MiniLM-L6-v2)
+        EMB --> FAISS[(FAISS\nVector Index)]
+    end
+
+    subgraph Query["🔍 Stage 1 — Retrieval (rag_chain.py)"]
+        Q[User Query] --> RS(Broad Similarity Search\nK=12)
+        RS --> FAISS
+        Q --> HS_BOOST(HS Code Targeted Search\nfilter: doc_type=hs_code)
+        HS_BOOST --> FAISS
+        FAISS --> FILTER{Domain-Aware\nChunk Filtering}
+        FILTER --> CTX_INC[INCOTERMS Chunks]
+        FILTER --> CTX_DGFT[DGFT Chunks]
+        FILTER --> CTX_HS[HS Code Chunks]
+        FILTER --> CTX_WTO[WTO Chunks]
+        FILTER --> CTX_ALL[All Chunks\nfor Summary]
+    end
+
+    subgraph Generation["⚡ Stage 2 — Parallel LLM Calls (ThreadPoolExecutor)"]
+        CTX_INC --> LLM1[INCOTERMS Expert LLM]
+        CTX_DGFT --> LLM2[DGFT Expert LLM]
+        CTX_HS --> LLM3[HS Code Expert LLM]
+        CTX_WTO --> LLM4[WTO Expert LLM]
+        CTX_ALL --> LLM5[Summary LLM]
+    end
+
+    subgraph UI["🖥️ Streamlit Dashboard (app.py)"]
+        LLM1 --> TAB1[📘 INCOTERMS Tab]
+        LLM2 --> TAB2[📋 DGFT Tab]
+        LLM3 --> TAB3[📊 HS Code & Duty Tab]
+        LLM4 --> TAB4[🌐 WTO Tab]
+        LLM5 --> SUM[📋 Executive Summary]
+    end
+```
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frameworks:** LangChain, Streamlit
-- **LLM Engine:** Groq API (High-speed Llama 3 models) / Google Gemini 3.1 Pro
-- **Embeddings:** HuggingFace `sentence-transformers` (`all-MiniLM-L6-v2`)
-- **Vector Database:** FAISS
-- **PDF Extraction:** `pdfplumber` with `PyPDF2` fallback
+| Layer | Technology |
+|---|---|
+| **Frontend** | Streamlit 1.38+, Custom CSS (Glassmorphism) |
+| **LLM** | Groq API — Llama 3.3 70B Versatile |
+| **Orchestration** | LangChain 0.3+ (Chains, Prompts, Parsers) |
+| **Embeddings** | HuggingFace `sentence-transformers/all-MiniLM-L6-v2` |
+| **Vector Store** | FAISS (CPU) |
+| **Structured Output** | Pydantic v2 schemas |
+| **PDF Parsing** | pdfplumber + PyPDF2 fallback |
+| **Parallelism** | `concurrent.futures.ThreadPoolExecutor` |
+| **Evaluation** | RAGAS (Context Precision, Answer Faithfulness) |
+| **Environment** | python-dotenv |
 
 ---
 
-## 🏗️ System Architecture
+## 🚀 Quickstart
 
-```mermaid
-graph TD
-    subgraph Data Sources
-        A[DGFT Policy PDFs] -->|pdfplumber| D(Text Chunking)
-        B[WTO Reviews PDFs] -->|pdfplumber| D
-        C[INCOTERMS & HS Codes JSON] -->|Direct Parsing| D
-    end
+### Prerequisites
+- Python **3.10+**
+- A valid **[Groq API Key](https://console.groq.com/)** (free tier available)
 
-    subgraph Vectorization & Storage
-        D -->|HuggingFace Embeddings| E[(FAISS Vector Database)]
-        E -.->|Stores Document Metadata| E
-    end
-
-    subgraph Query & Retrieval
-        F[User Query via Streamlit UI] --> G{Semantic Router}
-        G -->|Trade Policy Query| H[Similarity Search K=6]
-        G -->|Duty / HS Code Query| I[Targeted HS Code Filter Search]
-        H --> J[Aggregated Context]
-        I --> J
-    end
-
-    subgraph Generation & Validation
-        J --> K[Groq LLM Llama-3]
-        F --> K
-        K -->|JSON Output Parsing| L{Schema Validation}
-        L -->|Success| M[Structured Multi-Domain UI]
-        L -->|Fallback / Missing Info| N[Regex Cleanup & Truncation]
-        N --> M
-    end
-```
-
----
-
-## 🚀 Quickstart Guide
-
-### 1. Prerequisites
-Ensure you have **Python 3.10+** installed on your system.
-
-### 2. Clone the Repository
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/NaveenHuggi/Gen-AI-Hackathon-Project.git
 cd Gen-AI-Hackathon-Project
 ```
 
-### 3. Create a Virtual Environment
-It is highly recommended to use a virtual environment to prevent dependency conflicts.
+### 2. Create a Virtual Environment
 ```bash
 python -m venv venv
-# Activate on Windows:
+
+# Windows
 .\venv\Scripts\activate
-# Activate on Mac/Linux:
+
+# macOS / Linux
 source venv/bin/activate
 ```
 
-### 4. Install Dependencies
+### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Configure Environment Variables
-Copy the `.env.example` file to create a `.env` file and fill in your API keys.
+### 4. Configure Environment Variables
 ```bash
 cp .env.example .env
 ```
-*(You will need a valid `GROQ_API_KEY` for the LLM to function.)*
+Edit `.env` and add your key:
+```env
+GROQ_API_KEY=gsk_your_key_here
+```
 
-### 6. Build the FAISS Vector Index (Ingestion)
-Before running the dashboard, the system needs to process the regulatory PDFs and build the vector database. Put your PDFs in `Docs/Icoterms` and `Docs/trade` or use the ones provided.
+### 5. Add Your Documents
+Place your regulatory PDFs in the corresponding folders:
+```
+Docs/
+├── Icoterms/        ← INCOTERMS 2020 PDFs
+├── DGFT Trade Policy/  ← DGFT FTP PDFs
+├── ITC-HS Codes/    ← HS tariff PDFs (optional, JSON used by default)
+└── WTO/             ← WTO Trade Policy Review PDFs
+```
+
+### 6. Build the FAISS Index
 ```bash
 python src/ingest.py
 ```
-*This script will parse the PDFs, chunk the text, compute embeddings, and save the index into the `faiss_index/` directory.*
+This parses all PDFs, chunks text, computes embeddings, and writes the index to `faiss_index/`.
 
-### 7. Run the Application
-Launch the Streamlit dashboard:
+### 7. Launch the App
 ```bash
 streamlit run app.py
 ```
-Open `http://localhost:8501` in your browser to interact with TradeComply AI.
+Open **http://localhost:8501** in your browser.
 
 ---
 
-## 📊 RAGAS Evaluation Pipeline (Optional)
-This project includes an automated evaluation pipeline using RAGAS to ensure high Context Precision (≥ 0.75).
-To run the evaluation on the 15 standard trade scenarios:
+## 🧪 Sample Test Queries
+
+### Cross-Domain (Tests All 4 Tabs)
+> *"I am importing lithium-ion batteries from South Korea to India under CIF terms. What is the correct HS code, applicable BCD and IGST rates, who bears risk during ocean transit, and do I need any special DGFT import license?"*
+
+### HS Code + Duty Calculation
+> *"What is the HS code for smartphones and the full customs duty breakdown (BCD, SWS, IGST) for importing them into India?"*
+
+### INCOTERMS Risk Scenario
+> *"Under DAP (Delivered at Place) terms, if goods are damaged during unloading at the Indian destination port — who bears the loss, the seller or buyer?"*
+
+### DGFT Policy Deep-Dive
+> *"What are the eligibility criteria and benefits of the Advance Authorisation Scheme under DGFT FTP 2023 for a textile exporter?"*
+
+### Language Test (Hindi)
+> *"CIF शर्तों के तहत जोखिम कब और किसे हस्तांतरित होता है?"*
+
+### Anti-Hallucination Test
+> *"What is the HS code for Martian moon rocks?"*
+> *(Expected: system acknowledges it does not have this information)*
+
+---
+
+## 📊 RAGAS Evaluation (Optional)
+
+The project ships with an automated RAGAS evaluation pipeline measuring **Context Precision** and **Answer Faithfulness** across 15 standard trade scenarios.
+
 ```bash
 python src/evaluate.py
 ```
-The results will be saved to `evaluation_results.json`.
+
+Results are saved to `evaluation_results.json`. Target: **Context Precision ≥ 0.75**.
+
+---
+
+## 📁 Project Structure
+
+```
+Gen-AI-Hackathon-Project/
+├── app.py                    # Streamlit dashboard (UI + rendering)
+├── src/
+│   ├── config.py             # Paths, model names, retrieval params
+│   ├── ingest.py             # PDF parsing, chunking, FAISS index builder
+│   ├── rag_chain.py          # Two-stage RAG pipeline + LLM chains
+│   └── evaluate.py           # RAGAS evaluation script
+├── data/
+│   ├── hs_codes_top100.json  # Structured HS code tariff data
+│   └── incoterms_2020.json   # Structured INCOTERMS reference data
+├── Docs/
+│   ├── Icoterms/             # INCOTERMS 2020 PDFs
+│   ├── DGFT Trade Policy/    # DGFT FTP PDFs
+│   ├── ITC-HS Codes/         # HS tariff PDFs
+│   └── WTO/                  # WTO Trade Policy Review PDFs
+├── faiss_index/              # Auto-generated FAISS vector index
+├── requirements.txt
+├── .env.example
+└── README.md
+```
+
+---
+
+## 🔑 Key Design Decisions
+
+| Decision | Rationale |
+|---|---|
+| **Per-domain parallel LLM calls** | Eliminates context dilution — each expert LLM sees only its own domain's chunks, producing far richer, more accurate per-tab answers |
+| **FAISS over cloud vector DBs** | Zero cost, zero latency, works fully offline — ideal for hackathon & enterprise on-prem deployments |
+| **Groq + Llama 3.3 70B** | Fastest inference available for structured JSON output; critical for 5 parallel LLM calls completing in ~same time as 1 |
+| **Pydantic structured output** | Guarantees schema compliance; prevents hallucinated keys and malformed JSON from the LLM |
+| **Chunk size 1200 / overlap 200** | Optimized for regulatory PDFs: large enough to capture full clauses, overlap preserves cross-sentence context |
 
 ---
 
 ## 📜 License
-Developed for the Gen AI Hackathon 2026.
+
+Developed for the **Gen AI Hackathon 2026**.  
+© 2026 TradeComply AI Team. All rights reserved.

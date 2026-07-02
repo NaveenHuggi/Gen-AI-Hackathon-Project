@@ -28,7 +28,7 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 # ─── Groq LLM ───────────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
-GROQ_TEMPERATURE = 0.1
+GROQ_TEMPERATURE = 0.3
 GROQ_MAX_TOKENS = 2048
 
 # ─── Chunking Parameters ────────────────────────────────

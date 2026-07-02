@@ -70,7 +70,7 @@ class TradeQueryResponse(BaseModel):
 
 class UnifiedQueryResponse(BaseModel):
     """Structured output for unified trade queries across all 4 sources."""
-    description: str = Field(description="A concise summary or direct answer to the user's query.")
+    description: str = Field(description="A concise, well-structured, multi-bullet-point summary or direct answer to the user's query.")
     incoterms_context: str = Field(description="Detailed, comprehensive explanation of relevance and rules from INCOTERMS 2020. Put 'Not applicable' if irrelevant.")
     dgft_context: str = Field(description="Detailed, comprehensive explanation of relevance and policies from DGFT Foreign Trade Policy 2023. Put 'Not applicable' if irrelevant.")
     hs_code_context: str = Field(description="Detailed, comprehensive explanation of relevance and details from ITC-HS Customs Tariff Codes, including duty rates if applicable. Put 'Not applicable' if irrelevant.")
@@ -357,159 +357,259 @@ SOURCES:
 
         return response
 
-    # ─── Unified Trade Query ──────────────────────────────
-    def unified_trade_query(self, user_query: str, target_language: str = "English") -> dict:
+    # ─── Domain-Specific LLM Analyzer (Stage 2) ──────────
+    def _analyze_domain(self, domain_name: str, domain_prompt: str, context: str, user_query: str, language: str) -> str:
         """
-        Queries across all 4 domains (INCOTERMS, DGFT, HS Codes, WTO) and structures the output.
+        Run a focused LLM call for a single domain. Returns synthesized text.
+        If context is empty, returns a translated 'not applicable' message.
         """
-        # Increase K to ensure we capture context across different domains if possible
-        docs = self.retriever.invoke(user_query)
-        context = "\n\n---\n\n".join([doc.page_content for doc in docs])
-
-        sources = []
-        for doc in docs:
-            src = doc.metadata.get("source", "Unknown")
-            page = doc.metadata.get("page", "N/A")
-            chapter = doc.metadata.get("chapter", "")
-            sources.append(f"{src} — {chapter} (Page {page})")
-        source_str = "\n".join(set(sources))
+        if not context or not context.strip():
+            # Use a quick LLM call to produce a translated "not applicable" note
+            if language.lower() == "english":
+                return f"No {domain_name} documents were retrieved for this query. This domain may not be directly applicable to your question."
+            try:
+                quick_prompt = ChatPromptTemplate.from_messages([
+                    ("system", f"Translate the following sentence to {language}. Output ONLY the translated sentence, nothing else."),
+                    ("human", f"No {domain_name} documents were retrieved for this query. This domain may not be directly applicable to your question."),
+                ])
+                chain = quick_prompt | self.llm | StrOutputParser()
+                return chain.invoke({}).strip()
+            except Exception:
+                return f"No {domain_name} documents were retrieved for this query."
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a senior international trade and customs compliance expert.
-Your task is to provide an exhaustive, highly detailed, and professionally formatted analysis of the user's query using ONLY the provided context.
-
-Context may include:
-- INCOTERMS 2020 (ICC Rules)
-- DGFT Foreign Trade Policy 2023
-- ITC-HS Customs Tariff Codes
-- WTO Trade Policy Reviews
-
-INSTRUCTIONS FOR OUTPUT:
-1. Your Direct Summary MUST be elaborate. Explain the complete scenario tying together the product, duty, shipping term, and regulatory policies into a cohesive 2-3 paragraph professional summary.
-2. For EACH of the 4 domains, you MUST provide a detailed, comprehensive explanation (at least 3-4 sentences per domain). Do NOT provide just a single sentence.
-3. Cite exact clauses, chapter numbers, duty percentages, and page numbers where available.
-4. If a domain is not relevant, explicitly explain WHY it is not applicable based on the context, rather than just saying "Not applicable".
-5. CRITICAL ANTI-HALLUCINATION RULE: If the retrieved context does not contain the specific answer to the user's query, you MUST abort the detailed structure and output EXACTLY and ONLY the phrase "I do not have the information regarding this in my knowledge base." Do NOT attempt to summarize unrelated context or guess.
-6. OUTPUT LANGUAGE: You MUST generate your ENTIRE output (including all domains and summaries) perfectly translated into {language}.
-
-RETRIEVED CONTEXT:
-{context}
-
-SOURCES:
-{sources}"""),
-            ("human", "{query}"),
+            ("system", domain_prompt),
+            ("human", "User Question: {query}\n\nRetrieved Context:\n{context}\n\nREMINDER: Your entire response MUST be in {language}."),
         ])
-
-        structured_llm = self.llm.with_structured_output(UnifiedQueryResponse)
-        chain = prompt | structured_llm
+        chain = prompt | self.llm | StrOutputParser()
 
         try:
-            result = chain.invoke({
-                "context": context,
-                "query": user_query,
-                "sources": source_str,
-                "language": target_language,
-            })
-            response = result.model_dump()
-            
-            # Catch LLM rambling about missing info even in structured output
-            missing_info_phrases = [
-                "i do not have the information regarding this in my knowledge base",
-                "is not explicitly mentioned in the provided context",
-                "does not mention",
-                "not provide information",
-                "does not specifically address",
-                "is not mentioned in the provided context"
-            ]
-            desc_lower = response.get("description", "").lower()
-            if any(phrase in desc_lower for phrase in missing_info_phrases):
-                response = {
-                    "description": "I do not have the information regarding this in my knowledge base.",
-                    "incoterms_context": "Not applicable.",
-                    "dgft_context": "Not applicable.",
-                    "hs_code_context": "Not applicable.",
-                    "wto_context": "Not applicable.",
-                    "citations": []
-                }
-
+            result = chain.invoke({"query": user_query, "context": context, "language": language})
+            return result.strip()
         except Exception as e:
-            logger.error(f"Unified query structured output failed: {e}")
-            fallback_chain = prompt | self.llm | StrOutputParser()
-            text_result = fallback_chain.invoke({
-                "context": context,
-                "query": user_query,
-                "sources": source_str,
-                "language": target_language,
-            })
-            import re
-            
-            # Catch LLM rambling about missing info
-            missing_info_phrases = [
-                "i do not have the information regarding this in my knowledge base",
-                "is not explicitly mentioned in the provided context",
-                "does not mention",
-                "not provide information",
-                "does not specifically address",
-                "is not mentioned in the provided context"
+            logger.error(f"Domain analysis failed for {domain_name}: {e}")
+            return f"Analysis unavailable for this domain due to an error: {e}"
+
+    # ─── Unified Trade Query (Two-Stage Per-Domain Architecture) ──────────────────────────────
+    def unified_trade_query(self, user_query: str, target_language: str = "English") -> dict:
+        """
+        Two-stage RAG pipeline:
+          Stage 1 — Retrieve chunks with domain-aware filtering.
+          Stage 2 — Run 5 independent parallel LLM calls (1 per domain + 1 summary).
+        """
+        import re
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # ── Stage 1: Retrieve & Domain-Filter ────────────────────────────────
+        # Broad retrieval with higher K to catch cross-domain content
+        all_docs = self.vectorstore.similarity_search(user_query, k=12)
+
+        # Try domain-specific HS code retrieval if relevant
+        query_lower = user_query.lower()
+        if any(t in query_lower for t in ["hs code", "duty", "tariff", "import", "customs", "battery", "product", "lithium"]):
+            clean_q = re.sub(r"(what is|the|for|into india|standard|associated with|importing them)", "", query_lower).strip()
+            hs_docs = self.vectorstore.similarity_search(clean_q, k=4, filter={"doc_type": "hs_code"})
+            # Merge without duplicates
+            seen = {d.page_content for d in all_docs}
+            for d in hs_docs:
+                if d.page_content not in seen:
+                    all_docs.append(d)
+                    seen.add(d.page_content)
+
+        def filter_docs(keyword_list):
+            filtered = [
+                d for d in all_docs
+                if any(kw in d.metadata.get("source", "").lower() for kw in keyword_list)
             ]
-            
-            # Check if it triggered the anti-hallucination rule or is rambling about missing info
-            text_result_lower = text_result.lower()
-            is_missing_info = any(phrase in text_result_lower for phrase in missing_info_phrases)
-            
-            if is_missing_info and len(text_result) > 200:
-                # If it's rambling for more than 200 chars about missing info, just cut it off.
-                response = {
-                    "description": "I do not have the information regarding this in my knowledge base.",
-                    "incoterms_context": "Not applicable.",
-                    "dgft_context": "Not applicable.",
-                    "hs_code_context": "Not applicable.",
-                    "wto_context": "Not applicable.",
-                    "citations": []
-                }
-            elif "i do not have the information regarding this in my knowledge base" in text_result_lower:
-                response = {
-                    "description": "I do not have the information regarding this in my knowledge base.",
-                    "incoterms_context": "Not applicable.",
-                    "dgft_context": "Not applicable.",
-                    "hs_code_context": "Not applicable.",
-                    "wto_context": "Not applicable.",
-                    "citations": []
-                }
-            else:
-                # Helper to extract sections based on headers
-                def extract_section(text, header):
-                    match = re.search(rf"{header}.*?(?=(?:INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade|$))", text, re.IGNORECASE | re.DOTALL)
-                    return match.group(0).strip() if match else "Not explicitly mentioned in the unstructured response. See summary."
+            return filtered if filtered else []
 
-                incoterms = extract_section(text_result, "INCOTERMS 2020")
-                hs_code = extract_section(text_result, "ITC-HS Customs")
-                dgft = extract_section(text_result, "DGFT Foreign")
-                wto = extract_section(text_result, "WTO Trade")
-                
-                # The summary is anything before the first major header
-                summary_match = re.split(r"INCOTERMS 2020|ITC-HS Customs|DGFT Foreign|WTO Trade", text_result, maxsplit=1, flags=re.IGNORECASE)
-                summary = summary_match[0].strip() if summary_match else text_result
+        incoterms_docs = filter_docs(["incoterm", "icoterm"])
+        dgft_docs      = filter_docs(["dgft", "trade policy", "foreign trade"])
+        hs_docs_filt   = [d for d in all_docs if d.metadata.get("doc_type") == "hs_code"
+                          or any(kw in d.metadata.get("source", "").lower() for kw in ["hs", "itc", "tariff", "customs code"])]
+        wto_docs       = filter_docs(["wto", "world trade"])
 
-                response = {
-                    "description": summary if summary else "See detailed domains below.",
-                    "incoterms_context": incoterms,
-                    "dgft_context": dgft,
-                    "hs_code_context": hs_code,
-                    "wto_context": wto,
-                    "citations": sources
-                }
-        response["retrieved_sources"] = [
-            {
-                "source": doc.metadata.get("source"),
-                "chapter": doc.metadata.get("chapter"),
-                "page": doc.metadata.get("page"),
-                "preview": doc.page_content[:150],
+        def build_context(docs_list):
+            if not docs_list:
+                return ""
+            return "\n\n---\n\n".join(d.page_content for d in docs_list[:5])
+
+        incoterms_ctx = build_context(incoterms_docs)
+        dgft_ctx      = build_context(dgft_docs)
+        hs_ctx        = build_context(hs_docs_filt)
+        wto_ctx       = build_context(wto_docs)
+        full_ctx      = build_context(all_docs[:8])
+
+        # Build source citation list
+        sources = list({
+            f"{d.metadata.get('source', 'Unknown')} — {d.metadata.get('chapter', '')} (Page {d.metadata.get('page', 'N/A')})"
+            for d in all_docs
+        })
+
+        # ── Stage 2: Per-Domain Parallel LLM Calls ───────────────────────────
+
+        DOMAIN_PROMPTS = {
+            "INCOTERMS 2020": f"""You are an expert in INCOTERMS 2020 (ICC Rules). A user has asked a trade compliance question.
+Your job: Analyze the retrieved INCOTERMS 2020 document excerpts and provide a detailed, structured answer **specific to INCOTERMS 2020 rules only**.
+
+OUTPUT FORMAT (use markdown):
+### Risk & Delivery
+Explain at what point risk transfers from seller to buyer under the applicable INCOTERM(s).
+
+### Seller's Obligations
+List what the seller is responsible for (delivery, export clearance, cost, insurance).
+
+### Buyer's Obligations
+List what the buyer is responsible for (import clearance, destination costs, risk from point of delivery).
+
+### Applicable Rule(s)
+Name the specific INCOTERM rule(s) relevant to this query and why.
+
+### Key Note
+Any important 2020 updates or distinctions relevant to this query.
+
+RULES:
+- Base your answer ONLY on the retrieved context.
+- Do NOT copy-paste raw text. Synthesize and explain.
+- If INCOTERMS rules are not directly relevant to this query, clearly explain why and provide general guidance.
+- Output in {target_language}.""",
+
+            "DGFT Foreign Trade Policy": f"""You are an expert in India's DGFT Foreign Trade Policy 2023 (and prior FTPs).
+A user has asked a trade compliance question. Analyze ONLY the DGFT-related retrieved context.
+
+OUTPUT FORMAT (use markdown):
+### Policy Overview
+What DGFT policy, scheme, or regulation applies to this query?
+
+### Import / Export Requirements
+Specific import licensing, registration, or documentation requirements under DGFT for this product/scenario.
+
+### Applicable Scheme / Benefit
+Are there any DGFT export promotion schemes (e.g., Advance Authorisation, MEIS, RoDTEP, EPCG) relevant here?
+
+### Compliance Steps
+Step-by-step regulatory compliance checklist for the importer/exporter.
+
+### Citation
+Cite the specific FTP chapter, policy notification, or circular referenced.
+
+RULES:
+- Base your answer ONLY on retrieved context.
+- Do NOT copy-paste raw text. Synthesize clearly.
+- If DGFT is not directly relevant, explain why.
+- Output in {target_language}.""",
+
+            "HS Code & Customs Duty": f"""You are an Indian customs classification expert specializing in ITC-HS codes and customs duty computation.
+A user has asked about HS codes and/or customs duties. Analyze ONLY the HS/tariff retrieved context.
+
+OUTPUT FORMAT (use markdown):
+### HS Code Classification
+State the most likely HS Code (6 or 8 digit), the official product description, and the chapter it falls under.
+
+### Duty Structure
+| Component | Rate | Notes |
+|---|---|---|
+| Basic Customs Duty (BCD) | X% | ... |
+| Social Welfare Surcharge (SWS) | 10% of BCD | Standard |
+| Integrated GST (IGST) | X% | Applied on AV+BCD+SWS |
+| **Effective Duty %** | ~X% | Approximate total |
+
+### Classification Rationale
+Why this HS code is the correct classification for the product described.
+
+### Important Notes
+Any exemptions, notifications, or special provisions that may apply.
+
+RULES:
+- Base your answer ONLY on retrieved context. Do NOT invent duty rates.
+- If exact HS code is in context, use it. If not, state the chapter.
+- Do NOT copy-paste raw text.
+- Output in {target_language}.""",
+
+            "WTO Trade Policy": f"""You are an expert in WTO trade policy and international trade agreements.
+A user has asked a trade compliance question. Analyze ONLY the WTO-related retrieved context.
+
+OUTPUT FORMAT (use markdown):
+### WTO Framework Applicability
+How do WTO agreements (GATT, TBT, SPS, Customs Valuation Agreement, etc.) apply to this query?
+
+### Bound vs. Applied Tariff Rates
+If tariff data is in context, distinguish between WTO-bound rates and India's applied MFN rates.
+
+### Trade Policy Review Insights
+Any India Trade Policy Review findings relevant to this product or sector.
+
+### International Trade Implications
+How WTO membership affects import/export compliance for this product/scenario.
+
+RULES:
+- Base your answer ONLY on retrieved context.
+- Do NOT copy-paste raw text. Synthesize clearly.
+- If WTO context is not relevant, explain why in 2 sentences.
+- Output in {target_language}.""",
+
+            "Summary": f"""You are a senior international trade compliance expert.
+A user has asked a trade question. You have retrieved context from INCOTERMS 2020, DGFT, HS Codes, and WTO sources.
+Write a concise executive summary of the complete answer.
+
+OUTPUT FORMAT (use markdown bullet points):
+- **Query Topic**: What the user is asking
+- **Key HS Code / Product**: The HS classification (if applicable)
+- **Duty Snapshot**: BCD%, IGST%, approx. effective rate (if applicable)
+- **Shipping Term Guidance**: Which INCOTERM applies and what it means for risk
+- **Regulatory Action Required**: Top 1-2 compliance steps the user needs to take
+- **Practical Takeaway**: One clear sentence conclusion
+
+RULES:
+- Be specific. Use actual rates and codes from context if available.
+- Do NOT copy-paste raw text.
+- Output in {target_language}.""",
+        }
+
+        domain_tasks = {
+            "incoterms": ("INCOTERMS 2020", DOMAIN_PROMPTS["INCOTERMS 2020"], incoterms_ctx),
+            "dgft":      ("DGFT Foreign Trade Policy", DOMAIN_PROMPTS["DGFT Foreign Trade Policy"], dgft_ctx),
+            "hs_code":   ("HS Code & Customs Duty", DOMAIN_PROMPTS["HS Code & Customs Duty"], hs_ctx),
+            "wto":       ("WTO Trade Policy", DOMAIN_PROMPTS["WTO Trade Policy"], wto_ctx),
+            "summary":   ("Summary", DOMAIN_PROMPTS["Summary"], full_ctx),
+        }
+
+        results = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(
+                    self._analyze_domain,
+                    name, prompt_text, ctx, user_query, target_language
+                ): key
+                for key, (name, prompt_text, ctx) in domain_tasks.items()
             }
-            for doc in docs
-        ]
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    results[key] = future.result()
+                except Exception as e:
+                    results[key] = f"Analysis failed: {e}"
+
+        response = {
+            "description":       results.get("summary", "See domain tabs below for detailed analysis."),
+            "incoterms_context": results.get("incoterms", "Not applicable."),
+            "dgft_context":      results.get("dgft", "Not applicable."),
+            "hs_code_context":   results.get("hs_code", "Not applicable."),
+            "wto_context":       results.get("wto", "Not applicable."),
+            "citations":         sources,
+            "retrieved_sources": [
+                {
+                    "source":  d.metadata.get("source"),
+                    "chapter": d.metadata.get("chapter"),
+                    "page":    d.metadata.get("page"),
+                    "preview": d.page_content[:200],
+                }
+                for d in all_docs[:8]
+            ],
+        }
 
         return response
+
 
 
     # ─── Raw Retrieval (for RAGAS evaluation) ──────────
