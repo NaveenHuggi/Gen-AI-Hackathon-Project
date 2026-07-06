@@ -375,8 +375,8 @@ if submit_button:
                     ]
                 }
         else:
-            with st.spinner(f"Analyzing across all knowledge bases in {target_language}..."):
-                result = pipeline.unified_trade_query(unified_query, target_language=target_language)
+            with st.spinner("Analyzing across all knowledge bases..."):
+                result = pipeline.unified_trade_query(unified_query)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -386,7 +386,7 @@ if submit_button:
             st.markdown("### 📑 Comprehensive Analysis")
         with col_lang:
             st.markdown(
-                f'<div style="text-align: right;"><span class="status-tag">🌐 {target_language}</span></div>',
+                f'<div style="text-align: right;"><span class="status-tag">🌐 English</span></div>',
                 unsafe_allow_html=True
             )
             

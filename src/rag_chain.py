@@ -358,40 +358,50 @@ SOURCES:
         return response
 
     # ─── Domain-Specific LLM Analyzer (Stage 2) ──────────
-    def _analyze_domain(self, domain_name: str, domain_prompt: str, context: str, user_query: str, language: str) -> str:
+    def _analyze_domain(self, domain_name: str, domain_prompt: str, context: str, user_query: str) -> str:
         """
         Run a focused LLM call for a single domain. Returns synthesized text.
-        If context is empty, returns a translated 'not applicable' message.
+        If context is empty, returns a not-applicable message.
         """
         if not context or not context.strip():
-            # Use a quick LLM call to produce a translated "not applicable" note
-            if language.lower() == "english":
-                return f"No {domain_name} documents were retrieved for this query. This domain may not be directly applicable to your question."
-            try:
-                quick_prompt = ChatPromptTemplate.from_messages([
-                    ("system", f"Translate the following sentence to {language}. Output ONLY the translated sentence, nothing else."),
-                    ("human", f"No {domain_name} documents were retrieved for this query. This domain may not be directly applicable to your question."),
-                ])
-                chain = quick_prompt | self.llm | StrOutputParser()
-                return chain.invoke({}).strip()
-            except Exception:
-                return f"No {domain_name} documents were retrieved for this query."
+            return f"No {domain_name} documents were retrieved for this query. This domain may not be directly applicable to your question."
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", domain_prompt),
-            ("human", "User Question: {query}\n\nRetrieved Context:\n{context}\n\nREMINDER: Your entire response MUST be in {language}."),
+            ("human", "User Question: {query}\n\nRetrieved Context:\n{context}"),
         ])
         chain = prompt | self.llm | StrOutputParser()
 
         try:
-            result = chain.invoke({"query": user_query, "context": context, "language": language})
-            return result.strip()
+            result = chain.invoke({"query": user_query, "context": context})
+            return self._clean_repetitions(result.strip())
         except Exception as e:
             logger.error(f"Domain analysis failed for {domain_name}: {e}")
             return f"Analysis unavailable for this domain due to an error: {e}"
 
+    @staticmethod
+    def _clean_repetitions(text: str) -> str:
+        """
+        Strip repeating 'Final Answer' / paragraph loops that small LLMs sometimes produce.
+        Splits on double-newline, keeps only the first occurrence of each unique paragraph.
+        """
+        # Detect hard repetition loops (same phrase repeated 3+ times)
+        import re
+        # Remove any block that repeats "Final Answer" more than twice
+        text = re.sub(r'(Final Answer\s*\n.*?){3,}', 'Final Answer\n[Repetition detected and trimmed]\n', text, flags=re.DOTALL | re.IGNORECASE)
+
+        paragraphs = text.split("\n\n")
+        seen = []
+        deduped = []
+        for para in paragraphs:
+            stripped = para.strip()
+            if stripped and stripped not in seen:
+                seen.append(stripped)
+                deduped.append(para)
+        return "\n\n".join(deduped)
+
     # ─── Unified Trade Query (Two-Stage Per-Domain Architecture) ──────────────────────────────
-    def unified_trade_query(self, user_query: str, target_language: str = "English") -> dict:
+    def unified_trade_query(self, user_query: str) -> dict:
         """
         Two-stage RAG pipeline:
           Stage 1 — Retrieve chunks with domain-aware filtering.
@@ -471,8 +481,9 @@ Any important 2020 updates or distinctions relevant to this query.
 RULES:
 - Base your answer ONLY on the retrieved context.
 - Do NOT copy-paste raw text. Synthesize and explain.
-- If INCOTERMS rules are not directly relevant to this query, clearly explain why and provide general guidance.
-- Output in {target_language}.""",
+- If INCOTERMS rules are not directly relevant to this query, clearly explain why in 2 sentences, then stop.
+- Output in English only.
+- STOP after your analysis is complete. Do NOT repeat any section. Do NOT write 'Final Answer' multiple times.""",
 
             "DGFT Foreign Trade Policy": f"""You are an expert in India's DGFT Foreign Trade Policy 2023 (and prior FTPs).
 A user has asked a trade compliance question. Analyze ONLY the DGFT-related retrieved context.
@@ -496,8 +507,9 @@ Cite the specific FTP chapter, policy notification, or circular referenced.
 RULES:
 - Base your answer ONLY on retrieved context.
 - Do NOT copy-paste raw text. Synthesize clearly.
-- If DGFT is not directly relevant, explain why.
-- Output in {target_language}.""",
+- If DGFT is not directly relevant, explain why in 2 sentences, then stop.
+- Output in English only.
+- STOP after your analysis is complete. Do NOT repeat any section or conclusion.""",
 
             "HS Code & Customs Duty": f"""You are an Indian customs classification expert specializing in ITC-HS codes and customs duty computation.
 A user has asked about HS codes and/or customs duties. Analyze ONLY the HS/tariff retrieved context.
@@ -524,7 +536,8 @@ RULES:
 - Base your answer ONLY on retrieved context. Do NOT invent duty rates.
 - If exact HS code is in context, use it. If not, state the chapter.
 - Do NOT copy-paste raw text.
-- Output in {target_language}.""",
+- Output in English only.
+- STOP after the table and notes. Do NOT repeat the classification or any conclusion.""",
 
             "WTO Trade Policy": f"""You are an expert in WTO trade policy and international trade agreements.
 A user has asked a trade compliance question. Analyze ONLY the WTO-related retrieved context.
@@ -545,8 +558,9 @@ How WTO membership affects import/export compliance for this product/scenario.
 RULES:
 - Base your answer ONLY on retrieved context.
 - Do NOT copy-paste raw text. Synthesize clearly.
-- If WTO context is not relevant, explain why in 2 sentences.
-- Output in {target_language}.""",
+- If WTO context is not relevant, explain why in 2 sentences, then stop.
+- Output in English only.
+- STOP after your analysis. Do NOT repeat any paragraph or conclusion.""",
 
             "Summary": f"""You are a senior international trade compliance expert.
 A user has asked a trade question. You have retrieved context from INCOTERMS 2020, DGFT, HS Codes, and WTO sources.
@@ -563,7 +577,8 @@ OUTPUT FORMAT (use markdown bullet points):
 RULES:
 - Be specific. Use actual rates and codes from context if available.
 - Do NOT copy-paste raw text.
-- Output in {target_language}.""",
+- Output in English only.
+- STOP after the bullet points. Do NOT write a separate conclusion or repeat any point.""",
         }
 
         domain_tasks = {
@@ -579,7 +594,7 @@ RULES:
             futures = {
                 executor.submit(
                     self._analyze_domain,
-                    name, prompt_text, ctx, user_query, target_language
+                    name, prompt_text, ctx, user_query
                 ): key
                 for key, (name, prompt_text, ctx) in domain_tasks.items()
             }
