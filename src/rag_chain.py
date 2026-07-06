@@ -459,32 +459,28 @@ SOURCES:
         # ── Stage 2: Per-Domain Parallel LLM Calls ───────────────────────────
 
         DOMAIN_PROMPTS = {
-            "INCOTERMS 2020": f"""You are an expert in INCOTERMS 2020 (ICC Rules). A user has asked a trade compliance question.
-Your job: Analyze the retrieved INCOTERMS 2020 document excerpts and provide a detailed, structured answer **specific to INCOTERMS 2020 rules only**.
+            "INCOTERMS 2020": """You are an INCOTERMS 2020 expert. Answer the user's question using ONLY the retrieved context.
 
-OUTPUT FORMAT (use markdown):
+STRICT OUTPUT RULES:
+- If the query is NOT about shipping terms / INCOTERMS (e.g. HS codes, customs duty, product classification), output ONLY: "INCOTERMS 2020 rules are not directly applicable to this query." Then STOP.
+- Do NOT copy raw document text. Write in your own words.
+- Do NOT echo any template instructions. Do NOT write placeholder descriptions like "Explain at what point..." or "List what the seller is responsible for...".
+- Do NOT add Notes, disclaimers, or scope statements at the end.
+- Do NOT use brackets [ ] in your output.
+
+When INCOTERMS IS relevant, write these 4 sections with real content:
+
 ### Risk & Delivery
-Explain at what point risk transfers from seller to buyer under the applicable INCOTERM(s).
+State which INCOTERM applies and the exact point where risk passes from seller to buyer.
 
 ### Seller's Obligations
-List what the seller is responsible for (delivery, export clearance, cost, insurance).
+Describe what the seller must arrange: delivery, export clearance, freight booking, insurance if required.
 
 ### Buyer's Obligations
-List what the buyer is responsible for (import clearance, destination costs, risk from point of delivery).
-
-### Applicable Rule(s)
-Name the specific INCOTERM rule(s) relevant to this query and why.
+Describe what the buyer must handle: import clearance, unloading, inland transport, destination costs.
 
 ### Key Note
-Any important 2020 updates or distinctions relevant to this query.
-
-RULES:
-- Base your answer ONLY on the retrieved context.
-- Do NOT copy-paste raw text. Synthesize and explain.
-- NEVER output a partial sentence or a fragment that starts mid-word or with a lowercase letter.
-- If INCOTERMS rules are not directly relevant to this query, clearly explain why in 2 sentences, then stop.
-- Output in English only.
-- STOP after your analysis is complete. Do NOT repeat any section. Do NOT write 'Final Answer' multiple times.""",
+One practical insight or important 2020 rule change relevant to this scenario.""",
 
             "DGFT Foreign Trade Policy": f"""You are an expert in India's DGFT Foreign Trade Policy 2023 (and prior FTPs).
 A user has asked a trade compliance question. Analyze ONLY the DGFT-related retrieved context.

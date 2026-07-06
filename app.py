@@ -313,21 +313,41 @@ st.markdown("""
 def render_domain_card(icon: str, label: str, value: str):
     """Render a premium domain context card."""
     import re
-    # Strip raw document section headers that may have leaked through (e.g. "A4 DELIVERY:")
+    # Strip raw document section headers (e.g. "A4 DELIVERY:")
     value = re.sub(r'\b([AB]\d{1,2})\s+(DELIVERY|TRANSFER OF RISKS|NOTICE|INSURANCE|COSTS|CARRIAGE)[:\s]', '', value)
+    # Strip INCOTERMS chunk header lines: "XXX | Full Rule Name XXX (...) Incoterms 2020 ..."
+    value = re.sub(r'^[A-Z]{2,3}\s*\|\s*[^\n]+Incoterms\s*2020[^\n]*', '', value, flags=re.MULTILINE | re.IGNORECASE)
+    # Strip "EXPLANATORY NOTES FOR USERS" lines
+    value = re.sub(r'EXPLANATORY NOTES FOR USERS[^\n]*', '', value, flags=re.IGNORECASE)
+    # Strip any "Question Analysis" or "Answer" meta-commentary block
+    value = re.sub(r'Question Analysis\s*\n.*?(?=\n###|\Z)', '', value, flags=re.DOTALL | re.IGNORECASE)
+    value = re.sub(r'^Answer\s*$', '', value, flags=re.MULTILINE)
+    # Strip known template placeholder lines that LLM might echo verbatim
+    template_phrases = [
+        r'^Explain at what point risk transfers.*$',
+        r'^List what the seller is responsible for.*$',
+        r'^List what the buyer is responsible for.*$',
+        r'^Name the specific INCOTERM rule.*$',
+        r'^Any important 2020 updates.*$',
+        r'^Note:.*outside the scope of INCOTERMS.*$',
+        r'^\[.*\]$',  # any line that is purely a bracket placeholder
+    ]
+    for pattern in template_phrases:
+        value = re.sub(pattern, '', value, flags=re.MULTILINE | re.IGNORECASE)
     # Strip garbled mid-sentence PDF fragments — lines starting with a partial/lowercase word
-    # e.g. "ﬁed place of destination, these costs will be for the seller's account."
     lines = value.split('\n')
     cleaned_lines = []
     for line in lines:
         stripped = line.strip()
         # Drop lines that start mid-sentence: first char is lowercase or a ligature char (ﬁ, ﬂ etc)
-        if stripped and (stripped[0].islower() or ord(stripped[0]) > 127 and stripped[0] not in '📘📋📊🌐•\u2022'):
+        if stripped and (stripped[0].islower() or ord(stripped[0]) > 127 and stripped[0] not in '📘📋📊🌐•\u2022#*-'):
             continue
         cleaned_lines.append(line)
     value = '\n'.join(cleaned_lines).strip()
-    
-    is_empty = not value or value.strip().lower() in ("not applicable", "not applicable.", "")
+    # Collapse multiple blank lines into one
+    value = re.sub(r'\n{3,}', '\n\n', value).strip()
+
+    is_empty = not value or value.strip().lower() in ("not applicable", "not applicable.", "incoterms 2020 rules are not directly applicable to this query.", "")
     
     st.markdown(f"""
     <div class="domain-card">
