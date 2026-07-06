@@ -21,7 +21,7 @@
 
 **TradeComply AI** is an enterprise-grade Retrieval-Augmented Generation (RAG) system designed for export managers, freight forwarders, customs brokers, and trade compliance teams.
 
-It ingests and semantically indexes complex international trade regulatory documents and provides **structured, citation-backed, multi-domain answers** to natural language queries — in **5 languages**.
+It ingests and semantically indexes complex international trade regulatory documents and provides **structured, citation-backed, multi-domain answers** to natural language queries — in **English**.
 
 ### Knowledge Base Covers:
 | Domain | Source |
@@ -55,8 +55,11 @@ Total Duty = BCD + SWS + IGST
 Total Landed Cost = AV + Total Duty
 ```
 
-### 🌐 Multi-Language Output
-Full response translation into **English, Hindi, French, Spanish, and Mandarin** — across all domain tabs and the executive summary.
+### 🛡️ Anti-Hallucination & Integrity Guard
+A Python-level interceptor scans every LLM output before rendering:
+- **Repetition loop breaker** — detects and truncates any "Final Answer" loop or repeated paragraph before it reaches the UI
+- **PDF fragment stripper** — removes garbled mid-sentence fragments from PDF chunk boundaries (e.g. ligature text like `ﬁed place of destination...`)
+- **Out-of-scope detection** — if retrieved context doesn't answer the query, the system explicitly states it rather than hallucinating
 
 ### 📎 Source Citations
 Every answer is backed by source document metadata: file name, chapter, and page number for instant verification.
@@ -203,9 +206,6 @@ Open **http://localhost:8501** in your browser.
 ### DGFT Policy Deep-Dive
 > *"What are the eligibility criteria and benefits of the Advance Authorisation Scheme under DGFT FTP 2023 for a textile exporter?"*
 
-### Language Test (Hindi)
-> *"CIF शर्तों के तहत जोखिम कब और किसे हस्तांतरित होता है?"*
-
 ### Anti-Hallucination Test
 > *"What is the HS code for Martian moon rocks?"*
 > *(Expected: system acknowledges it does not have this information)*
@@ -259,6 +259,8 @@ Gen-AI-Hackathon-Project/
 | **Groq + Llama 3.3 70B** | Fastest inference available for structured JSON output; critical for 5 parallel LLM calls completing in ~same time as 1 |
 | **Pydantic structured output** | Guarantees schema compliance; prevents hallucinated keys and malformed JSON from the LLM |
 | **Chunk size 1200 / overlap 200** | Optimized for regulatory PDFs: large enough to capture full clauses, overlap preserves cross-sentence context |
+| **English-only output** | Ensures consistent, auditable responses; eliminates translation-induced mistranslations of legal terminology |
+| **Anti-repetition cleaner** | Python post-processor deduplicates paragraphs and truncates LLM loop patterns before any text reaches the UI |
 
 ---
 

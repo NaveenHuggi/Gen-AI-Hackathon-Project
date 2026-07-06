@@ -481,6 +481,7 @@ Any important 2020 updates or distinctions relevant to this query.
 RULES:
 - Base your answer ONLY on the retrieved context.
 - Do NOT copy-paste raw text. Synthesize and explain.
+- NEVER output a partial sentence or a fragment that starts mid-word or with a lowercase letter.
 - If INCOTERMS rules are not directly relevant to this query, clearly explain why in 2 sentences, then stop.
 - Output in English only.
 - STOP after your analysis is complete. Do NOT repeat any section. Do NOT write 'Final Answer' multiple times.""",

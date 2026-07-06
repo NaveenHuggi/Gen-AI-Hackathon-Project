@@ -275,10 +275,11 @@ with st.sidebar:
     st.divider()
     
     st.markdown("### ⚙️ Preferences")
-    target_language = st.selectbox(
-        "Response Language", 
-        ["English", "Hindi", "French", "Spanish", "Mandarin"], 
-        index=0,
+    st.markdown(
+        "<div style='background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); "
+        "border-radius: 8px; padding: 10px; font-size: 0.85rem; color: #a5b4fc;'>"
+        "🌐 Response Language: <strong>English</strong></div>",
+        unsafe_allow_html=True
     )
     
     st.divider()
@@ -312,8 +313,19 @@ st.markdown("""
 def render_domain_card(icon: str, label: str, value: str):
     """Render a premium domain context card."""
     import re
-    # Strip raw document section headers that may have leaked through
+    # Strip raw document section headers that may have leaked through (e.g. "A4 DELIVERY:")
     value = re.sub(r'\b([AB]\d{1,2})\s+(DELIVERY|TRANSFER OF RISKS|NOTICE|INSURANCE|COSTS|CARRIAGE)[:\s]', '', value)
+    # Strip garbled mid-sentence PDF fragments — lines starting with a partial/lowercase word
+    # e.g. "ﬁed place of destination, these costs will be for the seller's account."
+    lines = value.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Drop lines that start mid-sentence: first char is lowercase or a ligature char (ﬁ, ﬂ etc)
+        if stripped and (stripped[0].islower() or ord(stripped[0]) > 127 and stripped[0] not in '📘📋📊🌐•\u2022'):
+            continue
+        cleaned_lines.append(line)
+    value = '\n'.join(cleaned_lines).strip()
     
     is_empty = not value or value.strip().lower() in ("not applicable", "not applicable.", "")
     
